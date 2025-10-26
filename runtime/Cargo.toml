@@ -1,0 +1,33 @@
+[package]
+name = "runtime"
+author = "fltLi"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+extractor = { path = "../extractor" }
+thiserror = { workspace = true }
+url = "2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+js-sys = { version = "*", optional = true }
+wasm-bindgen = { version = "*", optional = true }
+wasm-bindgen-futures = { version = "*", optional = true }
+serde-wasm-bindgen = { version = "*", optional = true }
+
+[features]
+default = ["wasm"]
+wasm = ["dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "dep:serde-wasm-bindgen"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+debug = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

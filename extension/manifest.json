@@ -1,0 +1,32 @@
+{
+    "manifest_version": 3,
+    "name": "rsubmitter-7fa4",
+    "description": "7FA4 外站题目提交记录同步器",
+    "version": "0.1.0",
+    "content_security_policy": {
+        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+    },
+    "action": {
+        "default_popup": "popup.html"
+    },
+    "permissions": [
+        "storage",
+        "activeTab",
+        "scripting"
+    ],
+    "host_permissions": [
+        "*://*.7fa4.cn/*",
+        "*://7fa4.cn/*"
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "wasm/runtime.js",
+                "wasm/runtime_bg.wasm"
+            ],
+            "matches": [
+                "<all_urls>"
+            ]
+        }
+    ]
+}

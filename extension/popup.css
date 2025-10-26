@@ -1,0 +1,112 @@
+/* Fluent-inspired minimal CSS for popup UI (Fluent 2 like) */
+:root {
+  --bg: #f6f7f8;
+  --card-bg: linear-gradient(180deg, #ffffff, #f8fafc);
+  --muted: #6b7280;
+  --accent: #0078d4;
+  --accent-2: #2b88d8;
+  --pill-bg: rgba(0, 0, 0, 0.06);
+  --btn-bg: linear-gradient(180deg, #0078d4, #0063c9);
+  --btn-radius: 8px;
+  --card-radius: 12px;
+  color-scheme: light;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Segoe UI, -apple-system, 'Helvetica Neue', Arial;
+  font-size: 13px;
+  color: #0f1720;
+  background: var(--bg);
+}
+
+.fluint-wrapper {
+  padding: 12px;
+}
+
+.fluent-card {
+  width: 520px;
+  min-width: 320px;
+  background: var(--card-bg);
+  border-radius: var(--card-radius);
+  box-shadow: 0 6px 18px rgba(15, 23, 38, 0.08);
+  overflow: hidden;
+}
+
+.fluent-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.fluent-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 20px;
+  box-shadow: 0 2px 6px rgba(2, 122, 212, 0.12);
+}
+
+.fluent-title {
+  font-weight: 600;
+  font-size: 15px;
+  color: #07203a;
+}
+
+.status-pill {
+  margin-left: auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--pill-bg);
+  color: var(--muted);
+  font-size: 12px
+}
+
+.fluent-actions {
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px
+}
+
+.fluent-btn {
+  background: transparent;
+  border: 1px solid rgba(2, 6, 23, 0.06);
+  color: #07203a;
+  padding: 8px 12px;
+  border-radius: var(--btn-radius);
+  cursor: pointer;
+  transition: all .12s;
+}
+
+.fluent-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(2, 6, 23, 0.06)
+}
+
+.fluent-btn.secondary {
+  background: rgba(2, 6, 23, 0.03)
+}
+
+.fluent-msg {
+  padding: 12px 16px;
+  color: var(--muted);
+  font-size: 13px;
+  border-top: 1px solid rgba(2, 6, 23, 0.04)
+}
+
+/* small responsive */
+@media (max-width:560px) {
+  .fluent-card {
+    width: 92vw
+  }
+}
