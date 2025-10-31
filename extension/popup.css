@@ -1,5 +1,13 @@
 /* Modern minimal CSS for popup UI */
 
+/*
+ * Copyright (c) 2025 fltLi
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 :root {
   --primary: #0078d4;
   --primary-dark: #0063c9;

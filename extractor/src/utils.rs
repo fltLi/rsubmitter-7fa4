@@ -1,5 +1,13 @@
 //! 辅助工具
 
+/*
+ * Copyright (c) 2025 fltLi
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 /// 将时间字符串解析为毫秒
 pub fn parse_time_to_ms(s: &str) -> Option<i32> {
     let txt = s.trim();

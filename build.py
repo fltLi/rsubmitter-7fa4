@@ -3,6 +3,14 @@ rsubmitter 构建脚本
 使用方法: python build.py <输出目录>
 """
 
+"""
+Copyright (c) 2025 fltLi
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at https://mozilla.org/MPL/2.0/.
+"""
+
 import sys
 import shutil
 import subprocess
