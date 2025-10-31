@@ -13,14 +13,10 @@ thiserror = { workspace = true }
 url = "2"
 serde = { workspace = true }
 serde_json = { workspace = true }
-js-sys = { version = "*", optional = true }
-wasm-bindgen = { version = "*", optional = true }
-wasm-bindgen-futures = { version = "*", optional = true }
-serde-wasm-bindgen = { version = "*", optional = true }
-
-[features]
-default = ["wasm"]
-wasm = ["dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "dep:serde-wasm-bindgen"]
+js-sys = "*"
+wasm-bindgen = "*"
+wasm-bindgen-futures = "*"
+serde-wasm-bindgen = "*"
 
 [profile.release]
 opt-level = "z"

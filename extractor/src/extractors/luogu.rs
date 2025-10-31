@@ -10,6 +10,7 @@ use regex::Regex;
 use crate::error::*;
 use crate::models::*;
 use crate::traits::Extractor;
+use crate::utils::*;
 
 // 题目链接
 static PROBLEM_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"/problem/(P?\d+)").unwrap());
@@ -51,12 +52,12 @@ impl LuoguExtractor {
                 match key.as_str() {
                     "编程语言" => language = value,
                     "用时" => {
-                        if let Some(v) = crate::utils::parse_time_to_ms(&value) {
+                        if let Some(v) = parse_time_to_ms(&value) {
                             total_time = v;
                         }
                     }
                     "内存" => {
-                        if let Some(v) = crate::utils::parse_mem_to_kb(&value) {
+                        if let Some(v) = parse_mem_to_kb(&value) {
                             max_memory = v;
                         }
                     }
@@ -199,4 +200,84 @@ impl Extractor for LuoguExtractor {
 
         Ok(submission)
     }
+}
+
+#[test]
+fn test_extract() -> Result<()> {
+    let url = "https://www.luogu.com.cn/record/241494617";
+    let content = r#"
+        <!DOCTYPE html>
+        <html>
+        <body>
+            <div class="stat color-inverse">
+                <div class="field">
+                    <span class="key">编程语言</span>
+                    <span class="value">C++17 O2</span>
+                </div>
+                <div class="field">
+                    <span class="key">用时</span>
+                    <span class="value">2.33s</span>
+                </div>
+                <div class="field">
+                    <span class="key">内存</span>
+                    <span class="value">1.55MB</span>
+                </div>
+            </div>
+
+            <div class="info-rows">
+                <div>
+                    <span>评测状态</span>
+                    <span style="color: rgb(82, 196, 26);">Accepted</span>
+                </div>
+                <div>
+                    <span>评测分数</span>
+                    <span style="font-weight: bold; color: rgb(82, 196, 26);">100</span>
+                </div>
+            </div>
+
+            <a href="/problem/P4198">P4198 楼房重建</a>
+
+            <pre><code class="language-cpp">
+                #include &lt;bits/stdc++.h&gt;
+                using u32 = uint32_t; using u64 = uint64_t;
+                constexpr u32 N = 1e5 + 10, M = 320;
+                template &lt;typename T&gt;
+                void read(T&amp; v) {
+                    v = 0; char ch;
+                    while (!isdigit(ch = getchar()));
+                    do { v = (v &lt;&lt; 1) + (v &lt;&lt; 3) + (ch ^ '0'); } while (isdigit(ch = getchar()));
+                }
+
+                struct Block {
+                    u32 max;
+                    std::vector&lt;u32&gt; cnt;
+                };
+
+                u32 n, b, cnt, h[N];
+                Block par[M];
+
+                auto main() -&gt; int {
+                    u32 m, u, v, cnt = 0;
+                    read(n), read(m), b = sqrt(n);
+                    while (m--) {
+                        read(u), read(v);
+                        printf("%u\n", modify(u, v) ? cnt = count() : cnt);
+                    }
+                }
+            </code></pre>
+        </body>
+        </html>"#;
+
+    let submission = LuoguExtractor {}.extract(url, content)?;
+
+    assert_eq!(submission.pid, "P4198".to_string());
+    assert_eq!(submission.rid, "241494617".to_string());
+    assert_eq!(submission.language, SubmissionLanguage::Cpp17);
+    assert_eq!(submission.status, SubmissionStatus::Accepted);
+    assert_eq!(submission.max_memory, parse_mem_to_kb("1.55MB").unwrap());
+    assert_eq!(submission.total_time, parse_time_to_ms("2.33s").unwrap());
+
+    // println!("{}", submission.code);
+
+    Ok(())
 }

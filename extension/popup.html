@@ -4,11 +4,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>CSubmitter-7FA4</title>
+  <title>7FA4提交器</title>
   <link rel="stylesheet" href="popup.css" />
 </head>
 
 <body>
+  <!-- HTML 结构定义 -->
   <div class="fluint-wrapper">
     <div class="fluent-card">
       <div class="fluent-header">
@@ -16,16 +17,18 @@
         <div class="fluent-title">rsubmitter - 7fa4</div>
         <div class="status-pill" id="loginStatus">未登录</div>
       </div>
-
       <div class="fluent-actions">
         <button id="getCookies" class="fluent-btn">获取登录信息</button>
         <button id="sendPage" class="fluent-btn secondary">发送提交记录</button>
       </div>
-
       <div class="fluent-msg" id="message">就绪</div>
     </div>
   </div>
-  <script type="module" src="popup.js"></script>
+
+  <!-- 加载脚本 -->
+  <script src="core.js"></script>
+  <script src="ui.js"></script>
+  <script src="popup.js"></script>
 </body>
 
 </html>

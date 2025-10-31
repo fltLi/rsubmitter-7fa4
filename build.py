@@ -19,7 +19,7 @@ def build_wasm(output_dir: str):
     print(f"构建 WASM 到 {wasm_output}...")
     
     result = subprocess.run(
-        ["wasm-pack", "build", "--release", "--target", "web", "--out-dir", str(wasm_output), "--features", "wasm"],
+        ["wasm-pack", "build", "--release", "--target", "web", "--out-dir", str(wasm_output)],
         cwd="runtime"
     )
     
@@ -38,9 +38,11 @@ def copy_extension(output_dir: str):
     # 要复制的文件列表
     files = [
         "manifest.json",
-        "popup.html", 
+        "popup.html",
         "popup.js",
         "popup.css",
+        "core.js",
+        "ui.js",
     ]
     
     # 复制每个文件

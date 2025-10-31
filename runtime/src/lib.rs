@@ -1,27 +1,20 @@
-//! 提交器后台运行环境支持
-
-#![allow(dead_code)]
+//! 后台运行环境支持 - WASM 版本
 
 use extractor::error;
 use extractor::models::Submission;
 use serde::{Deserialize, Serialize};
-
-#[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
-/// 解析后的Cookie信息
+/// 解析后的 Cookie 信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CookieInfo {
-    /// login cookie 值
     pub login: Option<String>,
-    /// connect.sid cookie 值
     #[serde(rename = "connect.sid")]
     pub connect_sid: Option<String>,
-    /// 用于发送请求的主机 (例如 "oj.7fa4.cn" 或 "jx.7fa4.cn:8888")
     pub chost: Option<String>,
 }
 
-/// 提取成功时生成的HTTP请求规范
+/// 提取成功时生成的 HTTP 请求规范
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RequestSpec {
     pub url: String,
@@ -30,7 +23,7 @@ pub struct RequestSpec {
     pub body: serde_json::Value,
 }
 
-/// 调用 `Runtime::extract` 或 `parse_cookie` 后返回给JS的输出
+/// 提取操作的输出结果
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExtractOutput {
     pub success: bool,
@@ -45,7 +38,7 @@ impl From<error::Result<Submission>> for ExtractOutput {
             Ok(sub) => ExtractOutput {
                 success: true,
                 error: None,
-                partial: Some(sub), // 成功时包含提取的提交数据
+                partial: Some(sub),
                 request: None,
             },
             Err(e) => match e {
@@ -57,7 +50,7 @@ impl From<error::Result<Submission>> for ExtractOutput {
                 },
                 error::Error::NoExtractor(u) => ExtractOutput {
                     success: false,
-                    error: Some(format!("没有找到适用于URL的提取器: {u}")),
+                    error: Some(format!("没有找到适用于 URL 的提取器: {u}")),
                     partial: None,
                     request: None,
                 },
@@ -66,37 +59,34 @@ impl From<error::Result<Submission>> for ExtractOutput {
     }
 }
 
-/// 导出到WASM的运行时。保存解析的cookie信息并生成请求规范。
-#[cfg(feature = "wasm")]
+/// WASM 运行时, 用于管理 Cookie 信息和执行提取操作
 #[wasm_bindgen]
 pub struct Runtime {
     cookies: CookieInfo,
 }
 
-#[cfg(feature = "wasm")]
 #[wasm_bindgen]
 impl Runtime {
-    /// 从解析的cookie对象创建运行时
+    /// 从 JavaScript Cookie 对象创建运行时实例
     #[wasm_bindgen(constructor)]
     pub fn new(js_cookies: JsValue) -> Result<Runtime, JsValue> {
         let ci: CookieInfo = serde_wasm_bindgen::from_value(js_cookies)
-            .map_err(|e| JsValue::from_str(&format!("无效的cookies: {e}")))?;
+            .map_err(|e| JsValue::from_str(&format!("无效的 cookies: {e}")))?;
         Ok(Runtime { cookies: ci })
     }
 
-    /// 在 (url, html) 上运行提取器并返回JSON友好的输出
+    /// 从 URL 和 HTML 内容中提取提交信息并生成请求规范
     #[wasm_bindgen]
     pub fn extract(&self, url: &str, html: &str, in_contest: bool) -> JsValue {
         let res = extractor::extract(url, html);
+        let mut extract_output = ExtractOutput::from(res);
 
-        let extract_output = ExtractOutput::from(res);
-
-        // 只有在提取成功时才创建请求
         if extract_output.success
-            && let Some(sub) = extract_output.partial
+            && extract_output.partial.is_some()
+            && let Some(sub) = extract_output.partial.take()
         {
-            // 附加 in_contest 标志
             let mut body = serde_json::to_value(&sub).unwrap_or_else(|_| serde_json::json!({}));
+
             if let serde_json::Value::Object(ref mut map) = body {
                 map.insert(
                     "in_contest".to_string(),
@@ -111,14 +101,10 @@ impl Runtime {
                 .unwrap_or_else(|| "oj.7fa4.cn".to_string());
             let target = format!("http://{chost}/foreign_oj");
 
-            let cookie_header = if let (Some(login), Some(sid)) =
-                (&self.cookies.login, &self.cookies.connect_sid)
-            {
-                format!("login={login}; connect.sid={sid}")
-            } else if let Some(login) = &self.cookies.login {
-                format!("login={login}")
-            } else {
-                String::new()
+            let cookie_header = match (&self.cookies.login, &self.cookies.connect_sid) {
+                (Some(login), Some(sid)) => format!("login={login}; connect.sid={sid}"),
+                (Some(login), None) => format!("login={login}"),
+                _ => String::new(),
             };
 
             let headers = serde_json::json!({
@@ -133,49 +119,41 @@ impl Runtime {
                 body,
             };
 
-            let out = ExtractOutput {
+            extract_output = ExtractOutput {
                 success: true,
                 error: None,
                 partial: Some(sub),
                 request: Some(request),
             };
-
-            return serde_wasm_bindgen::to_value(&out)
-                .unwrap_or_else(|e| JsValue::from_str(&format!("序列化错误: {e}")));
         }
 
-        // 如果提取失败，返回原始的 extract_output
         serde_wasm_bindgen::to_value(&extract_output)
             .unwrap_or_else(|e| JsValue::from_str(&format!("序列化错误: {e}")))
     }
 }
 
-/// 解析原始的 `document.cookie` 字符串和origin为CookieInfo
-/// 此函数导出到JS，因此解析逻辑保留在Rust中
-#[cfg(feature = "wasm")]
+/// 解析原始的 document.cookie 字符串和 origin 为结构化 Cookie 信息
 #[wasm_bindgen]
 pub fn parse_cookie(cookie_str: &str, origin: &str) -> JsValue {
-    let mut login: Option<String> = None;
-    let mut connect_sid: Option<String> = None;
+    let mut login = None;
+    let mut connect_sid = None;
 
-    // 解析cookie字符串
     for part in cookie_str.split(';') {
         let p = part.trim();
         if p.is_empty() {
             continue;
         }
         if let Some(idx) = p.find('=') {
-            let k = p[..idx].trim();
-            let v = p[idx + 1..].trim();
-            match k {
-                "login" => login = Some(v.to_string()),
-                "connect.sid" => connect_sid = Some(v.to_string()),
+            let key = p[..idx].trim();
+            let value = p[idx + 1..].trim();
+            match key {
+                "login" => login = Some(value.to_string()),
+                "connect.sid" => connect_sid = Some(value.to_string()),
                 _ => (),
             }
         }
     }
 
-    // 根据origin确定chost，匹配已知的主机模式，回退到origin主机
     let chost = if origin.contains("oj.7fa4.cn") {
         Some("oj.7fa4.cn".to_string())
     } else if origin.contains("jx.7fa4.cn") {
@@ -183,19 +161,15 @@ pub fn parse_cookie(cookie_str: &str, origin: &str) -> JsValue {
     } else if origin.contains("in.7fa4.cn") {
         Some("in.7fa4.cn:8888".to_string())
     } else {
-        // 尝试从origin提取主机
-        if let Ok(u) = url::Url::parse(origin) {
-            Some(
-                u.host_str().unwrap_or("").to_string()
-                    + &(if let Some(port) = u.port() {
-                        format!(":{port}")
-                    } else {
-                        "".to_string()
-                    }),
-            )
-        } else {
-            None
-        }
+        url::Url::parse(origin).ok().and_then(|u| {
+            u.host_str().map(|host| {
+                if let Some(port) = u.port() {
+                    format!("{host}:{port}")
+                } else {
+                    host.to_string()
+                }
+            })
+        })
     };
 
     let ci = CookieInfo {
@@ -203,17 +177,7 @@ pub fn parse_cookie(cookie_str: &str, origin: &str) -> JsValue {
         connect_sid,
         chost,
     };
+
     serde_wasm_bindgen::to_value(&ci)
         .unwrap_or_else(|e| JsValue::from_str(&format!("序列化错误: {e}")))
-}
-
-// 用于本地测试 / 服务器的非 WASM 存根
-#[cfg(not(feature = "wasm"))]
-pub struct RuntimeNonWasm;
-
-#[cfg(not(feature = "wasm"))]
-impl RuntimeNonWasm {
-    pub fn new(_cookies: CookieInfo) -> Self {
-        RuntimeNonWasm {}
-    }
 }
