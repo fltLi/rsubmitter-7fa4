@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "rsubmitter-7fa4",
-    "description": "7FA4 外站题目提交记录同步器",
+    "description": "7FA4 外站提交同步器",
     "version": "0.1.0",
     "content_security_policy": {
         "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"

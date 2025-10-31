@@ -24,43 +24,46 @@ static SCORE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\d+)").unwrap());
 
 /// 洛谷提取器
 #[derive(Extractable)]
-#[extractor(name = "洛谷", tags = ["luogu", "Luogu"])]
+#[extractor(name = "luogu", tags = ["洛谷"])]
 pub struct LuoguExtractor {}
 
 impl LuoguExtractor {
     fn extract_basic_info(document: &Html) -> (String, i32, i32) {
         let mut language = String::new();
-        let mut total_time: i32 = 0;
-        let mut max_memory: i32 = 0;
+        let mut total_time = 0;
+        let mut max_memory = 0;
 
-        if let Ok(stat_sel) = Selector::parse(".stat.color-inverse")
-            && let Some(stat_el) = document.select(&stat_sel).next()
-            && let Ok(field_sel) = Selector::parse(".field")
-        {
+        let Ok(stat_sel) = Selector::parse(".stat.color-inverse") else {
+            return (language, total_time, max_memory);
+        };
+
+        if let Some(stat_el) = document.select(&stat_sel).next() {
+            let Ok(field_sel) = Selector::parse(".field") else {
+                return (language, total_time, max_memory);
+            };
+
             for field in stat_el.select(&field_sel) {
+                let (Ok(key_sel), Ok(value_sel)) =
+                    (Selector::parse(".key"), Selector::parse(".value"))
+                else {
+                    continue;
+                };
+
                 let key = field
-                    .select(&Selector::parse(".key").unwrap())
+                    .select(&key_sel)
                     .next()
                     .map(|e| e.text().collect::<String>().trim().to_string())
                     .unwrap_or_default();
                 let value = field
-                    .select(&Selector::parse(".value").unwrap())
+                    .select(&value_sel)
                     .next()
                     .map(|e| e.text().collect::<String>().trim().to_string())
                     .unwrap_or_default();
 
                 match key.as_str() {
                     "编程语言" => language = value,
-                    "用时" => {
-                        if let Some(v) = parse_time_to_ms(&value) {
-                            total_time = v;
-                        }
-                    }
-                    "内存" => {
-                        if let Some(v) = parse_mem_to_kb(&value) {
-                            max_memory = v;
-                        }
-                    }
+                    "用时" => total_time = parse_time_to_ms(&value).unwrap_or(0),
+                    "内存" => max_memory = parse_mem_to_kb(&value).unwrap_or(0),
                     _ => {}
                 }
             }
@@ -70,99 +73,131 @@ impl LuoguExtractor {
     }
 
     fn extract_code(document: &Html) -> String {
-        let mut code = String::new();
-        if let Ok(code_sel) = Selector::parse("code") {
-            for el in document.select(&code_sel) {
-                if let Some(cl) = el.value().attr("class")
-                    && cl.contains("language-")
-                {
-                    code = el.text().collect::<String>().trim().to_string();
-                    break;
-                }
-            }
-            if code.is_empty()
-                && let Some(el) = document.select(&code_sel).next()
+        let Ok(code_sel) = Selector::parse("code") else {
+            return String::new();
+        };
+
+        for el in document.select(&code_sel) {
+            if let Some(cl) = el.value().attr("class")
+                && cl.contains("language-")
             {
-                code = el.text().collect::<String>().trim().to_string();
+                return el.text().collect::<String>().trim().to_string();
             }
         }
-        if code.is_empty()
-            && let Ok(pre_sel) = Selector::parse("pre")
-            && let Some(el) = document.select(&pre_sel).next()
-        {
-            code = el.text().collect::<String>().trim().to_string();
+
+        if let Some(el) = document.select(&code_sel).next() {
+            return el.text().collect::<String>().trim().to_string();
         }
-        code
+
+        let Ok(pre_sel) = Selector::parse("pre") else {
+            return String::new();
+        };
+
+        document
+            .select(&pre_sel)
+            .next()
+            .map(|el| el.text().collect::<String>().trim().to_string())
+            .unwrap_or_default()
     }
 
     fn extract_pid(document: &Html) -> String {
-        let mut pid = String::new();
-        if let Ok(a_sel) = Selector::parse("a") {
-            for a in document.select(&a_sel) {
-                if let Some(href) = a.value().attr("href")
-                    && href.contains("/problem/")
-                    && let Some(caps) = PROBLEM_REGEX.captures(href)
-                    && let Some(m) = caps.get(1)
-                {
-                    pid = m.as_str().to_string();
-                    break;
-                }
+        let Ok(a_sel) = Selector::parse("a") else {
+            return String::new();
+        };
+
+        for a in document.select(&a_sel) {
+            if let Some(href) = a.value().attr("href")
+                && href.contains("/problem/")
+                && let Some(caps) = PROBLEM_REGEX.captures(href)
+                && let Some(m) = caps.get(1)
+            {
+                return m.as_str().to_string();
             }
         }
-        pid
+
+        String::new()
     }
 
     fn extract_status_and_score(document: &Html) -> (SubmissionStatus, i32) {
         let mut status = SubmissionStatus::Unknown;
-        let mut score: i32 = 0;
+        let mut score = 0;
 
-        if let Ok(rows_sel) = Selector::parse(".info-rows div") {
-            for row in document.select(&rows_sel) {
-                let row_text = row.text().collect::<String>();
-                if row_text.contains("评测状态") {
-                    let txt = row_text
-                        .split_whitespace()
-                        .last()
-                        .map(|s| s.trim().to_string())
-                        .unwrap_or_default();
-                    status = txt
-                        .parse::<SubmissionStatus>()
-                        .unwrap_or(SubmissionStatus::Unknown);
-                }
+        let Ok(rows_sel) = Selector::parse(".info-rows div") else {
+            return (status, score);
+        };
 
-                if row_text.contains("评测分数")
-                    && let Some(caps) = SCORE_REGEX.captures(&row_text)
-                    && let Some(m) = caps.get(1)
-                {
-                    score = m.as_str().parse().unwrap_or(0);
-                }
+        for row in document.select(&rows_sel) {
+            let row_text = row.text().collect::<String>();
+            if row_text.contains("评测状态") {
+                let txt = row_text
+                    .split_whitespace()
+                    .last()
+                    .map(|s| s.trim())
+                    .unwrap_or("");
+                status = txt.parse().unwrap_or(SubmissionStatus::Unknown);
+            }
+
+            if row_text.contains("评测分数")
+                && let Some(caps) = SCORE_REGEX.captures(&row_text)
+            {
+                score = caps
+                    .get(1)
+                    .and_then(|m| m.as_str().parse().ok())
+                    .unwrap_or(0);
             }
         }
 
         (status, score)
     }
 
-    fn extract_rid(url: &str) -> Option<String> {
+    fn extract_rid(url: &str) -> String {
         RECORD_REGEX
             .captures(url)
             .and_then(|c| c.get(1))
             .map(|m| m.as_str().to_string())
+            .unwrap_or_default()
+    }
+
+    fn extract_partial(&self, url: &str, content: &str) -> Submission {
+        let document = Html::parse_document(content);
+
+        let (language_text, total_time, max_memory) = Self::extract_basic_info(&document);
+        let code = Self::extract_code(&document);
+        let pid = Self::extract_pid(&document);
+        let (status, score) = Self::extract_status_and_score(&document);
+        let rid = Self::extract_rid(url);
+
+        let language = language_text.parse().unwrap_or_default();
+
+        Submission {
+            code,
+            pid,
+            rid,
+            oj: "luogu".to_string(),
+            language,
+            status,
+            total_time,
+            max_memory,
+            score,
+        }
     }
 
     fn validate_submission(sub: &Submission) -> Result<()> {
         if sub.pid.is_empty() {
-            return Err(Error::Extract(ExtractError::new(
+            return Err(Error::Extract(ExtractError::with_partial(
                 ExtractErrorKind::MissingField("pid".to_string()),
+                sub.clone(),
             )));
         }
         if sub.rid.is_empty() {
-            return Err(Error::Extract(ExtractError::new(
+            return Err(Error::Extract(ExtractError::with_partial(
                 ExtractErrorKind::MissingField("rid".to_string()),
+                sub.clone(),
             )));
         }
         if sub.code.is_empty() {
             return Err(Error::Extract(ExtractError::with_partial(
-                ExtractErrorKind::Parse("source code empty".to_string()),
+                ExtractErrorKind::MissingField("code".to_string()),
                 sub.clone(),
             )));
         }
@@ -172,32 +207,15 @@ impl LuoguExtractor {
 
 impl Extractor for LuoguExtractor {
     fn extract(&self, url: &str, content: &str) -> Result<Submission> {
-        let document = Html::parse_document(content);
+        if content.trim().is_empty() {
+            return Err(Error::Extract(ExtractError::new(
+                ExtractErrorKind::EmptyContent,
+            )));
+        }
 
-        let (language_text, total_time, max_memory) = LuoguExtractor::extract_basic_info(&document);
-        let code = LuoguExtractor::extract_code(&document);
-        let pid = LuoguExtractor::extract_pid(&document);
-        let (status, score) = LuoguExtractor::extract_status_and_score(&document);
+        let submission = self.extract_partial(url, content);
 
-        let rid_val = LuoguExtractor::extract_rid(url).unwrap_or_default();
-        let submission = Submission {
-            code,
-            pid,
-            rid: rid_val,
-            oj: "luogu".to_string(),
-            language: if language_text.is_empty() {
-                SubmissionLanguage::Cpp17
-            } else {
-                language_text.parse().unwrap_or(SubmissionLanguage::Cpp17)
-            },
-            status,
-            total_time,
-            max_memory,
-            score,
-        };
-
-        LuoguExtractor::validate_submission(&submission)?;
-
+        Self::validate_submission(&submission)?;
         Ok(submission)
     }
 }

@@ -1,6 +1,7 @@
 //! 提取器实现
 
 pub mod luogu;
+pub mod xyd;
 
 /// 收集注册的提取器
 /// 
@@ -9,5 +10,6 @@ pub mod luogu;
 pub(crate) fn registry_items() -> Vec<crate::factory::ExtractorRegistryItem> {
 	vec![
 		luogu::__EXTRACTOR_REGISTRY_LUOGUEXTRACTOR(),
+		xyd::__EXTRACTOR_REGISTRY_XINYOUDUIEXTRACTOR(),
 	]
 }

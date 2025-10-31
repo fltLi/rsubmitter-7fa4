@@ -69,6 +69,24 @@ pub mod error {
         MissingField(String),
         #[error("regex mismatch: {0}")]
         RegexMismatch(String),
+        #[error("selector parse error: {0}")]
+        SelectorParse(String),
+        #[error("time parse error: {0}")]
+        TimeParse(String),
+        #[error("memory parse error: {0}")]
+        MemoryParse(String),
+        #[error("language parse error: {0}")]
+        LanguageParse(String),
+        #[error("status parse error: {0}")]
+        StatusParse(String),
+        #[error("invalid url: {0}")]
+        InvalidUrl(String),
+        #[error("empty content")]
+        EmptyContent,
+        #[error("not in submission page: {0}")]
+        NotInSubmissionPage(String),
+        #[error("no submission selected: {0}")]
+        NoSubmissionSelected(String),
         #[error("other: {0}")]
         Other(String),
     }

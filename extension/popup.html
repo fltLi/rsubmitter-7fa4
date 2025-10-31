@@ -9,23 +9,21 @@
 </head>
 
 <body>
-  <!-- HTML 结构定义 -->
-  <div class="fluint-wrapper">
-    <div class="fluent-card">
-      <div class="fluent-header">
-        <div class="fluent-logo">R</div>
-        <div class="fluent-title">rsubmitter - 7fa4</div>
-        <div class="status-pill" id="loginStatus">未登录</div>
-      </div>
-      <div class="fluent-actions">
-        <button id="getCookies" class="fluent-btn">获取登录信息</button>
-        <button id="sendPage" class="fluent-btn secondary">发送提交记录</button>
-      </div>
-      <div class="fluent-msg" id="message">就绪</div>
+  <div class="container">
+    <div class="header">
+      <div class="logo">R</div>
+      <div class="title">7FA4提交器</div>
+      <div class="status" id="loginStatus">未登录</div>
     </div>
+
+    <div class="actions">
+      <button id="getCookies" class="btn primary">获取登录信息</button>
+      <button id="sendPage" class="btn">发送提交记录</button>
+    </div>
+
+    <div class="message" id="message">就绪</div>
   </div>
 
-  <!-- 加载脚本 -->
   <script src="core.js"></script>
   <script src="ui.js"></script>
   <script src="popup.js"></script>

@@ -1,6 +1,7 @@
 /**
  * 7FA4提交器 - 核心功能
  */
+
 class RSubmitterCore {
     constructor() {
         this.wasmModule = null;
@@ -89,11 +90,23 @@ class RSubmitterCore {
 
             const extractResult = this.runtimeInstance.extract(url, html, in_contest);
 
-            if (!extractResult?.request) {
-                return { ok: false, parsed: extractResult };
+            if (!extractResult?.request && !extractResult?.partial) {
+                return {
+                    ok: false,
+                    err: '无法提取提交信息',
+                    parsed: extractResult
+                };
             }
 
             const req = extractResult.request;
+            if (!req) {
+                return {
+                    ok: false,
+                    err: extractResult.error || '无法生成请求数据',
+                    parsed: extractResult
+                };
+            }
+
             const headers = new Headers();
             if (req.headers) {
                 Object.keys(req.headers).forEach(k => headers.set(k, req.headers[k]));
@@ -106,7 +119,27 @@ class RSubmitterCore {
                 body: typeof req.body === 'string' ? req.body : JSON.stringify(req.body),
             };
 
-            const response = await fetch(req.url, fetchOpts);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+            fetchOpts.signal = controller.signal;
+
+            let response;
+            try {
+                response = await fetch(req.url, fetchOpts);
+                clearTimeout(timeoutId);
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
+                if (fetchError.name === 'AbortError') {
+                    return {
+                        ok: false,
+                        err: '请求超时 (8 秒)',
+                        parsed: extractResult
+                    };
+                }
+                throw fetchError;
+            }
+
             const json = await response.json().catch(() => null);
 
             const businessSuccess = json && json.success === true;
@@ -115,10 +148,15 @@ class RSubmitterCore {
                 ok: true,
                 resp: json,
                 parsed: extractResult,
-                businessSuccess: businessSuccess
+                businessSuccess: businessSuccess,
+                statusCode: response.status
             };
         } catch (e) {
-            return { ok: false, err: String(e) };
+            return {
+                ok: false,
+                err: String(e),
+                parsed: extractResult
+            };
         }
     }
 
@@ -129,5 +167,10 @@ class RSubmitterCore {
         } else {
             return '已登录';
         }
+    }
+
+    async isLoggedIn() {
+        const status = await this.getLoginStatus();
+        return status === '已登录';
     }
 }

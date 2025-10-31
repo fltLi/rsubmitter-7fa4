@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 /// 7fa4 提交记录
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Submission {
     pub code: String,
     pub pid: String,
@@ -19,24 +19,9 @@ pub struct Submission {
     pub score: i32,
 }
 
-impl Default for Submission {
-    fn default() -> Self {
-        Self {
-            code: String::new(),
-            pid: String::new(),
-            rid: String::new(),
-            oj: String::new(),
-            language: SubmissionLanguage::Cpp17,
-            status: SubmissionStatus::Unknown,
-            total_time: 0,
-            max_memory: 0,
-            score: 0,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SubmissionStatus {
+    #[default]
     Unknown,
     Accepted,
     #[serde(rename = "Wrong Answer")]
@@ -57,34 +42,27 @@ impl FromStr for SubmissionStatus {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let txt = s.trim().to_lowercase();
+        let txt = s.replace(' ', "").to_lowercase();
         match txt.as_str() {
             "unknown" => Ok(SubmissionStatus::Unknown),
-            "accepted" | "通过" => Ok(SubmissionStatus::Accepted),
-            "wronganswer" | "错误答案" | "wrong answer" => Ok(SubmissionStatus::WrongAnswer),
-            "partiallycorrect" | "部分正确" | "partially correct" => {
-                Ok(SubmissionStatus::PartiallyCorrect)
-            }
-            "runtimeerror" | "运行时错误" | "runtime error" => {
-                Ok(SubmissionStatus::RuntimeError)
-            }
-            "compileerror" | "编译错误" | "compile error" => Ok(SubmissionStatus::CompileError),
-            "timelimitexceeded" | "超时" | "time limit exceeded" => {
-                Ok(SubmissionStatus::TimeLimitExceeded)
-            }
-            "memorylimitexceeded" | "内存" | "memory limit exceeded" => {
-                Ok(SubmissionStatus::MemoryLimitExceeded)
-            }
+            "accepted" => Ok(SubmissionStatus::Accepted),
+            "wronganswer" => Ok(SubmissionStatus::WrongAnswer),
+            "partiallycorrect" => Ok(SubmissionStatus::PartiallyCorrect),
+            "runtimeerror" => Ok(SubmissionStatus::RuntimeError),
+            "compileerror" => Ok(SubmissionStatus::CompileError),
+            "timelimitexceeded" => Ok(SubmissionStatus::TimeLimitExceeded),
+            "memorylimitexceeded" => Ok(SubmissionStatus::MemoryLimitExceeded),
             other => Err(format!("unknown submission status: {other}")),
-        }
+        } // 相信编译器会优化成 map !
     }
 }
 
 /// 提交语言
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SubmissionLanguage {
     #[serde(rename = "cpp14")]
     Cpp14,
+    #[default]
     #[serde(rename = "cpp17")]
     Cpp17,
     #[serde(rename = "cpp11")]
@@ -114,25 +92,84 @@ impl FromStr for SubmissionLanguage {
             return Err("empty language".to_string());
         }
 
-        let mut n = txt.replace(' ', "");
-        n = n.replace("c++", "cpp");
-        n = n.replace('+', "");
-        n = n.replace('\r', "");
-        n = n.replace('\n', "");
-        n = n.replace('-', "");
+        // 检测环境特征
+        let has_clang = txt.contains("clang");
+        let has_noilinux = txt.contains("noi") && txt.contains("linux");
 
-        match n.as_str() {
-            "cpp14" => Ok(SubmissionLanguage::Cpp14),
-            "cpp17" => Ok(SubmissionLanguage::Cpp17),
-            "cpp11" => Ok(SubmissionLanguage::Cpp11),
-            "cpp" => Ok(SubmissionLanguage::Cpp),
-            "cppnoilinux" => Ok(SubmissionLanguage::CppNoiLinux),
-            "cpp11noilinux" => Ok(SubmissionLanguage::Cpp11NoiLinux),
-            "cpp11clang" => Ok(SubmissionLanguage::Cpp11Clang),
-            "cpp17clang" => Ok(SubmissionLanguage::Cpp17Clang),
-            "c" => Ok(SubmissionLanguage::C),
-            "cnoilinux" => Ok(SubmissionLanguage::CNoiLinux),
-            other => Err(format!("unknown submission language: {other}")),
+        // 检测语言类型和版本
+        if txt.contains("c++") || txt.contains("cpp") {
+            match (has_clang, has_noilinux) {
+                (true, _) => {
+                    if txt.contains("17") {
+                        Ok(SubmissionLanguage::Cpp17Clang)
+                    } else {
+                        Ok(SubmissionLanguage::Cpp11Clang)
+                    }
+                }
+                (false, true) => {
+                    if txt.contains("11") {
+                        Ok(SubmissionLanguage::Cpp11NoiLinux)
+                    } else {
+                        Ok(SubmissionLanguage::CppNoiLinux)
+                    }
+                }
+                (false, false) => {
+                    if txt.contains("17") {
+                        Ok(SubmissionLanguage::Cpp17)
+                    } else if txt.contains("14") {
+                        Ok(SubmissionLanguage::Cpp14)
+                    } else if txt.contains("11") {
+                        Ok(SubmissionLanguage::Cpp11)
+                    } else {
+                        Ok(SubmissionLanguage::Cpp)
+                    }
+                }
+            }
+        } else if txt.contains('c') && !txt.contains("c#") && !txt.contains("cs") {
+            if has_noilinux {
+                Ok(SubmissionLanguage::CNoiLinux)
+            } else {
+                Ok(SubmissionLanguage::C)
+            }
+        } else {
+            Ok(SubmissionLanguage::Cpp17)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_language_parsing() {
+        assert_eq!("C++".parse(), Ok(SubmissionLanguage::Cpp));
+        assert_eq!("c++".parse(), Ok(SubmissionLanguage::Cpp));
+        assert_eq!("C++17 O2".parse(), Ok(SubmissionLanguage::Cpp17));
+        assert_eq!("C++14".parse(), Ok(SubmissionLanguage::Cpp14));
+        assert_eq!("C++11".parse(), Ok(SubmissionLanguage::Cpp11));
+        assert_eq!("C++".parse(), Ok(SubmissionLanguage::Cpp));
+        assert_eq!("cpp".parse(), Ok(SubmissionLanguage::Cpp));
+        assert_eq!("cpp17".parse(), Ok(SubmissionLanguage::Cpp17));
+        assert_eq!("c++17".parse(), Ok(SubmissionLanguage::Cpp17));
+        assert_eq!("C++17O2".parse(), Ok(SubmissionLanguage::Cpp17));
+        assert_eq!("C++ 17".parse(), Ok(SubmissionLanguage::Cpp17));
+
+        assert_eq!("C++17 Clang".parse(), Ok(SubmissionLanguage::Cpp17Clang));
+        assert_eq!("C++11 Clang".parse(), Ok(SubmissionLanguage::Cpp11Clang));
+        assert_eq!("cpp17 clang".parse(), Ok(SubmissionLanguage::Cpp17Clang));
+
+        assert_eq!(
+            "C++11 NOI Linux".parse(),
+            Ok(SubmissionLanguage::Cpp11NoiLinux)
+        );
+        assert_eq!("C++ NOI Linux".parse(), Ok(SubmissionLanguage::CppNoiLinux));
+
+        assert_eq!("C".parse(), Ok(SubmissionLanguage::C));
+        assert_eq!("C NOI Linux".parse(), Ok(SubmissionLanguage::CNoiLinux));
+        assert_eq!("c".parse(), Ok(SubmissionLanguage::C));
+
+        assert_eq!("C#".parse(), Ok(SubmissionLanguage::Cpp17));
+        assert_eq!("CSharp".parse(), Ok(SubmissionLanguage::Cpp17));
     }
 }
