@@ -16,11 +16,14 @@
 
 ## 待实现
 
-- 支持更多的 oj. (详见[submitter 支持列表](http://jx.7fa4.cn:9080/tools/submitter/-/blob/main/README.md))
+- 支持更多的 oj. (详见[submitter 支持列表](http://jx.7fa4.cn:9080/tools/submitter/-/blob/main/README.md))  
+   当前支持: [洛谷](https://www.luogu.com.cn/), [信友队](https://www.xinyoudui.com/).
 
-- 支持 vjudge 间接提交替他 oj 提交记录. (submitter 功能)
+- 支持 vjudge 间接提交其他 oj 提交记录. (submitter 功能)
 
 - 提供控制到字段的手动提交功能.
+
+- 添加提取器 wasm 更新获取功能, 支持热重载.
 
 ---
 
