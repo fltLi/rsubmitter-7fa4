@@ -13,7 +13,6 @@
 class RSubmitterCore {
     constructor() {
         this.wasmModule = null;
-        this.runtimeInstance = null;
     }
 
     async loadWasm() {
@@ -59,12 +58,6 @@ class RSubmitterCore {
 
             await chrome.storage.sync.set({ cookies: ci });
 
-            try {
-                this.runtimeInstance = new module.Runtime(ci);
-            } catch (e) {
-                console.warn('Runtime 实例化失败:', e);
-            }
-
             if (isValid7fa4Cookies) {
                 return { ok: true, message: '7FA4 登录信息保存成功' };
             } else {
@@ -92,39 +85,36 @@ class RSubmitterCore {
         try {
             const module = await this.loadWasm();
 
-            if (!this.runtimeInstance) {
-                this.runtimeInstance = new module.Runtime(cookies);
+            if (typeof module.extract_submission !== 'function') {
+                throw new Error('extract_submission 函数未找到');
             }
 
-            const extractResult = this.runtimeInstance.extract(url, html, in_contest);
+            const extractResult = module.extract_submission(url, html);
 
-            if (!extractResult?.request && !extractResult?.partial) {
+            if (!extractResult?.success || !extractResult?.partial) {
                 return {
                     ok: false,
-                    err: '无法提取提交信息',
+                    err: extractResult?.error || '无法提取提交信息',
                     parsed: extractResult
                 };
             }
 
-            const req = extractResult.request;
-            if (!req) {
+            // 构建请求
+            const request = this.buildRequest(extractResult.partial, cookies, in_contest);
+
+            if (!request) {
                 return {
                     ok: false,
-                    err: extractResult.error || '无法生成请求数据',
+                    err: '无法生成请求数据',
                     parsed: extractResult
                 };
-            }
-
-            const headers = new Headers();
-            if (req.headers) {
-                Object.keys(req.headers).forEach(k => headers.set(k, req.headers[k]));
             }
 
             const fetchOpts = {
-                method: req.method || 'POST',
-                headers,
+                method: request.method || 'POST',
+                headers: request.headers,
                 credentials: 'include',
-                body: typeof req.body === 'string' ? req.body : JSON.stringify(req.body),
+                body: typeof request.body === 'string' ? request.body : JSON.stringify(request.body),
             };
 
             const controller = new AbortController();
@@ -134,7 +124,7 @@ class RSubmitterCore {
 
             let response;
             try {
-                response = await fetch(req.url, fetchOpts);
+                response = await fetch(request.url, fetchOpts);
                 clearTimeout(timeoutId);
             } catch (fetchError) {
                 clearTimeout(timeoutId);
@@ -165,6 +155,41 @@ class RSubmitterCore {
                 err: String(e),
                 parsed: extractResult
             };
+        }
+    }
+
+    buildRequest(submission, cookies, in_contest) {
+        try {
+            let body = JSON.parse(JSON.stringify(submission)); // 深拷贝
+
+            // 添加 in_contest 字段
+            body.in_contest = in_contest;
+
+            const chost = cookies.chost || "oj.7fa4.cn";
+            const target = `http://${chost}/foreign_oj`;
+
+            // 构建 cookie header
+            let cookieHeader = "";
+            if (cookies.login && cookies['connect.sid']) {
+                cookieHeader = `login=${cookies.login}; connect.sid=${cookies['connect.sid']}`;
+            } else if (cookies.login) {
+                cookieHeader = `login=${cookies.login}`;
+            }
+
+            const headers = {
+                "Content-Type": "application/json",
+                "Cookie": cookieHeader
+            };
+
+            return {
+                url: target,
+                method: "POST",
+                headers: headers,
+                body: body
+            };
+        } catch (e) {
+            console.error('构建请求失败:', e);
+            return null;
         }
     }
 
