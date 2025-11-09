@@ -8,11 +8,16 @@
 
 extern crate proc_macro;
 
+use once_cell::sync::Lazy;
 use proc_macro::TokenStream;
 use quote::ToTokens;
 use quote::{format_ident, quote};
 use regex::Regex;
 use syn::{Attribute, DeriveInput, parse_macro_input};
+
+static NAME_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"name\s*=\s*\"([^\"]+)\""#).unwrap());
+static TAGS_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"tags\s*=\s*\[(?P<inner>[^\]]*)\]").unwrap());
 
 /// 提取器属性
 ///
@@ -20,7 +25,7 @@ use syn::{Attribute, DeriveInput, parse_macro_input};
 ///
 /// 在提取器类型上添加 `#[derive(Extractable)]` 并使用 `#[extractor(...)]` 属性指定元数据:
 ///
-/// ```rust
+/// ```ignore
 /// #[derive(Extractable)]
 /// #[extractor(name = "洛谷", tags = ["luogu", "Luogu"]) ]
 /// pub struct LuoguExtractor;
@@ -44,9 +49,6 @@ impl ExtractorAttributes {
         let mut name = None;
         let mut tags = Vec::new();
 
-        let name_re = Regex::new(r#"name\s*=\s*\"([^\"]+)\""#).unwrap();
-        let tags_re = Regex::new(r"tags\s*=\s*\[(?P<inner>[^\]]*)\]").unwrap();
-
         for attr in attrs {
             if attr.path().is_ident("extractor") {
                 // 将 Attribute 转为 token 字符串以便用正则解析
@@ -54,11 +56,11 @@ impl ExtractorAttributes {
                 attr.to_tokens(&mut ts);
                 let s = ts.to_string();
                 if name.is_none()
-                    && let Some(cap) = name_re.captures(&s)
+                    && let Some(cap) = NAME_REGEX.captures(&s)
                 {
                     name = Some(cap.get(1).unwrap().as_str().to_string());
                 }
-                if let Some(cap) = tags_re.captures(&s) {
+                if let Some(cap) = TAGS_REGEX.captures(&s) {
                     let inner = cap.name("inner").unwrap().as_str();
                     for part in inner.split(',') {
                         let t = part.trim().trim_matches('"').trim().to_string();
@@ -92,6 +94,9 @@ pub fn derive_extractable(input: TokenStream) -> TokenStream {
     let extractor_name = attrs.name;
     let tags = attrs.tags;
 
+    // literal for extractor name
+    let extractor_name_lit = syn::LitStr::new(&extractor_name, proc_macro2::Span::call_site());
+
     // 为每个提取器生成唯一的静态变量名 (全部大写以符合静态变量命名规范)
     let registry_item_name =
         format_ident!("__EXTRACTOR_REGISTRY_{}", name.to_string().to_uppercase());
@@ -114,6 +119,8 @@ pub fn derive_extractable(input: TokenStream) -> TokenStream {
         #[allow(non_snake_case)]
         pub fn #registry_item_name() -> crate::factory::ExtractorRegistryItem {
             crate::factory::ExtractorRegistryItem {
+                // 提取器的显示名称 (由宏属性提供)
+                name_fn: || -> &'static str { #extractor_name_lit },
                 rank_fn: |url: &str| -> u32 {
                     #rank_impl
                 },
@@ -129,12 +136,13 @@ pub fn derive_extractable(input: TokenStream) -> TokenStream {
 
 /// 生成 rank 方法的实现
 fn generate_rank_impl(name: &str, tags: &[String]) -> proc_macro2::TokenStream {
-    let tag_checks: Vec<_> = tags
+    let tag_checks: Vec<proc_macro2::TokenStream> = tags
         .iter()
         .map(|tag| {
             let tag_lower = tag.to_lowercase();
+            let lit = syn::LitStr::new(&tag_lower, proc_macro2::Span::call_site());
             quote! {
-                if url.to_lowercase().contains(#tag_lower) {
+                if url.to_lowercase().contains(#lit) {
                     score += 10;
                 }
             }
@@ -142,6 +150,7 @@ fn generate_rank_impl(name: &str, tags: &[String]) -> proc_macro2::TokenStream {
         .collect();
 
     let name_lower = name.to_lowercase();
+    let name_lit = syn::LitStr::new(&name_lower, proc_macro2::Span::call_site());
     quote! {
         let mut score = 0u32;
 
@@ -149,7 +158,7 @@ fn generate_rank_impl(name: &str, tags: &[String]) -> proc_macro2::TokenStream {
         #(#tag_checks)*
 
         // 基于名称的精确匹配
-        if url.to_lowercase().contains(#name_lower) {
+        if url.to_lowercase().contains(#name_lit) {
             score += 20;
         }
 

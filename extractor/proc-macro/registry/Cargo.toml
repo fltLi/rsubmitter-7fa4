@@ -11,4 +11,5 @@ proc-macro = true
 syn = { version = "2", features = ["full", "extra-traits"] }
 quote = "1"
 proc-macro2 = "1"
-regex = { workspace = true }
+once_cell.workspace = true
+regex.workspace = true

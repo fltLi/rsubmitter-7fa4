@@ -76,7 +76,7 @@ class RSubmitterCore {
         }
     }
 
-    async submitPage(url, html, in_contest = false) {
+    async submitPage(url, html, in_contest = false, options = { mapVjudge: false, observe: false }) {
         const { cookies } = await chrome.storage.sync.get(['cookies']);
         if (!cookies) {
             return { ok: false, err: '未找到 cookies' };
@@ -96,6 +96,42 @@ class RSubmitterCore {
                     ok: false,
                     err: extractResult?.error || '无法提取提交信息',
                     parsed: extractResult
+                };
+            }
+
+            // 可选: 若开启映射 VJudge 为来源并且提取器是 vjudge, 调用 wasm 的映射函数
+            if (options.mapVjudge && extractResult.extractor_name && typeof module.map_vjudge_submission === 'function') {
+                const ename = (extractResult.extractor_name || '').toString().toLowerCase();
+                if (ename.includes('vj') && ename.includes('vjudge')) {
+                    try {
+                        const mapped = module.map_vjudge_submission(extractResult.partial);
+                        if (mapped) {
+                            try {
+                                const arr = mapped;
+                                if (Array.isArray(arr) && arr.length >= 3) {
+                                    extractResult.partial.oj = arr[0];
+                                    extractResult.partial.pid = arr[1];
+                                    extractResult.partial.rid = arr[2];
+                                }
+                            } catch (e) { }
+                        }
+                    } catch (e) { }
+                }
+            }
+
+            // 如果仅观察模式, 不发送请求, 仅输出到控制台
+            if (options.observe) {
+                try {
+                    console.log('观测模式输出 submission:', extractResult.partial);
+                } catch (e) {
+                    // ignore
+                }
+                return {
+                    ok: true,
+                    resp: null,
+                    parsed: extractResult,
+                    businessSuccess: false,
+                    statusCode: 0
                 };
             }
 
@@ -155,6 +191,41 @@ class RSubmitterCore {
                 err: String(e),
                 parsed: extractResult
             };
+        }
+    }
+
+    // 仅提取提交信息, 不依赖 cookies, 也不发送任何请求. 
+    async extractSubmission(url, html) {
+        try {
+            const module = await this.loadWasm();
+
+            if (typeof module.extract_submission !== 'function') {
+                throw new Error('extract_submission 函数未找到');
+            }
+
+            const extractResult = module.extract_submission(url, html);
+
+            if (!extractResult?.success || !extractResult?.partial) {
+                return {
+                    ok: false,
+                    err: extractResult?.error || '无法提取提交信息',
+                    parsed: extractResult
+                };
+            }
+
+            try {
+                console.log('观测到的 submission:', extractResult.partial);
+            } catch (e) {
+                // 忽略 console 输出错误
+            }
+
+            return {
+                ok: true,
+                submission: extractResult.partial,
+                parsed: extractResult
+            };
+        } catch (e) {
+            return { ok: false, err: String(e) };
         }
     }
 

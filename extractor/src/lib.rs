@@ -14,7 +14,7 @@ pub mod extractors;
 mod factory;
 pub mod models;
 mod traits;
-mod utils;
+pub mod utils;
 
 pub use factory::{create_extractor, extract};
 pub use traits::Extractor;

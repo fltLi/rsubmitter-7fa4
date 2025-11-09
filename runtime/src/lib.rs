@@ -10,6 +10,7 @@
 
 use extractor::error;
 use extractor::models::Submission;
+use extractor::utils;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -28,40 +29,76 @@ pub struct ExtractOutput {
     pub success: bool,
     pub error: Option<String>,
     pub partial: Option<Submission>,
-}
-
-impl From<error::Result<Submission>> for ExtractOutput {
-    fn from(res: error::Result<Submission>) -> Self {
-        match res {
-            Ok(sub) => ExtractOutput {
-                success: true,
-                error: None,
-                partial: Some(sub),
-            },
-            Err(e) => match e {
-                error::Error::Extract(ee) => ExtractOutput {
-                    success: false,
-                    error: Some(format!("{ee}")),
-                    partial: ee.partial.map(|b| *b),
-                },
-                error::Error::NoExtractor(u) => ExtractOutput {
-                    success: false,
-                    error: Some(format!("没有找到适用于 URL 的提取器: {u}")),
-                    partial: None,
-                },
-            },
-        }
-    }
+    pub extractor_name: Option<String>,
 }
 
 /// 从 URL 和 HTML 内容中提取提交信息
 #[wasm_bindgen]
 pub fn extract_submission(url: &str, html: &str) -> JsValue {
-    let res = extractor::extract(url, html);
-    let extract_output = ExtractOutput::from(res);
+    // 先创建合适的提取器以获取其名称 (用于区分 vjudge) 
+    match extractor::create_extractor(url) {
+        Ok((ext, name)) => match ext.extract(url, html) {
+            Ok(sub) => {
+                let out = ExtractOutput {
+                    success: true,
+                    error: None,
+                    partial: Some(sub),
+                    extractor_name: Some(name),
+                };
+                serde_wasm_bindgen::to_value(&out)
+                    .unwrap_or_else(|e| JsValue::from_str(&format!("序列化错误: {e}")))
+            }
+            Err(e) => match e {
+                error::Error::Extract(ee) => {
+                    let out = ExtractOutput {
+                        success: false,
+                        error: Some(format!("{ee}")),
+                        partial: ee.partial.map(|b| *b),
+                        extractor_name: Some(name),
+                    };
+                    serde_wasm_bindgen::to_value(&out)
+                        .unwrap_or_else(|e| JsValue::from_str(&format!("序列化错误: {e}")))
+                }
+                error::Error::NoExtractor(u) => {
+                    let out = ExtractOutput {
+                        success: false,
+                        error: Some(format!("没有找到适用于 URL 的提取器: {u}")),
+                        partial: None,
+                        extractor_name: None,
+                    };
+                    serde_wasm_bindgen::to_value(&out)
+                        .unwrap_or_else(|e| JsValue::from_str(&format!("序列化错误: {e}")))
+                }
+            },
+        },
+        Err(e) => {
+            // 不能创建提取器
+            let out = ExtractOutput {
+                success: false,
+                error: Some(format!("创建提取器失败: {e}")),
+                partial: None,
+                extractor_name: None,
+            };
+            serde_wasm_bindgen::to_value(&out)
+                .unwrap_or_else(|e| JsValue::from_str(&format!("序列化错误: {e}")))
+        }
+    }
+}
 
-    serde_wasm_bindgen::to_value(&extract_output)
-        .unwrap_or_else(|e| JsValue::from_str(&format!("序列化错误: {e}")))
+/// 将 VJudge 的提取结果映射为可能的原始 OJ (如果适用)
+#[wasm_bindgen]
+pub fn map_vjudge_submission(submission: &JsValue) -> JsValue {
+    // 先将 JsValue 反序列化为 Submission
+    let sub: Submission = match serde_wasm_bindgen::from_value(submission.clone()) {
+        Ok(s) => s,
+        Err(e) => return JsValue::from_str(&format!("反序列化错误: {e}")),
+    };
+
+    match utils::map_vjudge_to_origin(&sub) {
+        Some((oj, pid, rid)) => serde_wasm_bindgen::to_value(&(oj, pid, rid))
+            .unwrap_or_else(|e| JsValue::from_str(&format!("序列化错误: {e}"))),
+        None => JsValue::NULL,
+    }
 }
 
 /// 解析原始的 document.cookie 字符串和 origin 为结构化 Cookie 信息

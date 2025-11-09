@@ -15,6 +15,7 @@ class RSubmitterUI {
     constructor(core) {
         this.core = core;
         this.initialized = false;
+        this.observeMode = false;
     }
 
     // 设置状态消息
@@ -91,16 +92,15 @@ class RSubmitterUI {
     }
 
     // 发送页面处理
-    async handleSendPage() {
+    async handleSendPageWithOptions(options = { mapVjudge: false, observe: false }) {
         if (!this.core) return;
 
-        const isLoggedIn = await this.core.isLoggedIn();
-        if (!isLoggedIn) {
-            this.setStatus('错误: 请先获取登录信息', true);
-            return;
+        if (options.observe) {
+            this.setStatus('观测模式: 准备提取...');
+        } else {
+            this.setStatus('准备发送...');
         }
 
-        this.setStatus('准备发送...');
         const tab = await this.core.getActiveTab();
         if (!tab) {
             this.setStatus('找不到活动标签页', true);
@@ -118,9 +118,23 @@ class RSubmitterUI {
                 }
 
                 const res = results[0].result;
+
+                if (options.observe) {
+                    this.setStatus('正在提取 (观测)...');
+                    const response = await this.core.extractSubmission(res.url || '', res.html || '');
+                    if (response.ok) {
+                        this.setStatus('提取完成 (观测) , 请查看扩展控制台');
+                        try { console.log('观测模式提交 (UI):', response.submission); } catch (e) { }
+                    } else {
+                        this.setStatus('提取失败: ' + (response.err || '未知错误'), true);
+                    }
+                    return;
+                }
+
                 this.setStatus('发送中...');
 
-                const response = await this.core.submitPage(res.url || '', res.html || '', false);
+                // 读取选项并调用 core.submitPage
+                const response = await this.core.submitPage(res.url || '', res.html || '', false, options);
 
                 if (response.ok) {
                     if (response.businessSuccess) {
@@ -157,15 +171,69 @@ class RSubmitterUI {
     initEvents() {
         if (this.initialized) return;
 
-        const getCookiesBtn = document.getElementById('getCookies');
-        const sendPageBtn = document.getElementById('sendPage');
+    const getCookiesBtn = document.getElementById('getCookies');
+    const sendPageBtn = document.getElementById('sendPage');
+    const sendOptionsToggle = document.getElementById('sendOptionsToggle');
+    const sendOptions = document.getElementById('sendOptions');
+    const optMapVjudge = document.getElementById('optMapVjudge');
+    const optObserve = document.getElementById('optObserve');
 
         if (getCookiesBtn) {
             getCookiesBtn.addEventListener('click', () => this.handleGetCookies());
         }
 
         if (sendPageBtn) {
-            sendPageBtn.addEventListener('click', () => this.handleSendPage());
+            sendPageBtn.addEventListener('click', () => {
+                const options = {
+                    mapVjudge: optMapVjudge ? optMapVjudge.checked : false,
+                    observe: optObserve ? optObserve.checked : false
+                };
+                this.handleSendPageWithOptions(options);
+            });
+        }
+
+        if (sendOptionsToggle && sendOptions) {
+            sendOptionsToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // 如果已经显示则隐藏
+                if (sendOptions.style.display === 'flex') {
+                    sendOptions.style.display = 'none';
+                    return;
+                }
+
+                // 作为流内元素显示在按钮下方，从而推动 popup 窗口高度扩展，避免裁切
+                sendOptions.style.position = '';
+                sendOptions.style.display = 'flex';
+            });
+
+            // 点击页面任意位置关闭 options
+            document.addEventListener('click', () => { if (sendOptions) sendOptions.style.display = 'none'; });
+
+            // 阻止 options 内部点击导致关闭
+            sendOptions.addEventListener('click', (e) => { e.stopPropagation(); });
+        }
+
+        // 初始化选项状态: 从 storage 读取并应用到复选框
+        chrome.storage.sync.get(['optMapVjudge', 'optObserve'], ({ optMapVjudge: storedMap, optObserve: storedObserve }) => {
+            try {
+                if (optMapVjudge) optMapVjudge.checked = !!storedMap;
+                if (optObserve) optObserve.checked = !!storedObserve;
+            } catch (e) {
+                // ignore
+            }
+        });
+        
+
+        // 保存选项变化
+        if (optObserve) {
+            optObserve.addEventListener('change', () => {
+                chrome.storage.sync.set({ optObserve: optObserve.checked });
+            });
+        }
+        if (optMapVjudge) {
+            optMapVjudge.addEventListener('change', () => {
+                chrome.storage.sync.set({ optMapVjudge: optMapVjudge.checked });
+            });
         }
 
         // 初始化登录状态

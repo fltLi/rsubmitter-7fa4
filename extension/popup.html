@@ -26,7 +26,15 @@
 
     <div class="actions">
       <button id="getCookies" class="btn primary">获取登录信息</button>
-      <button id="sendPage" class="btn">发送提交记录</button>
+      <div class="split-btn">
+        <button id="sendPage" class="btn">发送提交记录</button>
+        <button id="sendOptionsToggle" class="btn small" aria-label="更多选项">☰</button>
+      </div>
+    </div>
+
+    <div id="sendOptions" class="send-options" style="display:none;">
+      <label><input type="checkbox" id="optMapVjudge" /> 映射 VJudge 提交为来源</label>
+      <label><input type="checkbox" id="optObserve" /> 输出到控制台而非发送</label>
     </div>
 
     <div class="message" id="message">就绪</div>

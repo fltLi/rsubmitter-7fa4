@@ -18,6 +18,7 @@ use std::sync::Mutex;
 /// 提取器注册项
 #[derive(Clone)]
 pub(crate) struct ExtractorRegistryItem {
+    pub(crate) name_fn: fn() -> &'static str,
     pub(crate) rank_fn: fn(url: &str) -> u32,
     pub(crate) creator: fn() -> Box<dyn Extractor>,
 }
@@ -35,8 +36,8 @@ impl ExtractorFactory {
         Self { extractors: items }
     }
 
-    /// 根据 URL 创建最匹配的提取器
-    pub fn create_extractor(&self, url: &str) -> Result<Box<dyn Extractor>> {
+    /// 根据 URL 创建最匹配的提取器返回提取器实例和提取器名称
+    pub fn create_extractor(&self, url: &str) -> Result<(Box<dyn Extractor>, String)> {
         let mut candidates: Vec<_> = self
             .extractors
             .iter()
@@ -49,7 +50,9 @@ impl ExtractorFactory {
         if let Some((highest_score, item)) = candidates.first()
             && *highest_score > 0
         {
-            return Ok((item.creator)());
+            let inst = (item.creator)();
+            let name = (item.name_fn)().to_string();
+            return Ok((inst, name));
         }
 
         Err(Error::NoExtractor(url.to_string()))
@@ -59,15 +62,12 @@ impl ExtractorFactory {
 static FACTORY: Lazy<Mutex<ExtractorFactory>> = Lazy::new(|| Mutex::new(ExtractorFactory::new()));
 
 /// 创建提取器
-pub fn create_extractor(url: &str) -> Result<Box<dyn Extractor>> {
+pub fn create_extractor(url: &str) -> Result<(Box<dyn Extractor>, String)> {
     FACTORY.lock().unwrap().create_extractor(url)
 }
 
 /// 直接提取
 pub fn extract(url: &str, content: &str) -> Result<Submission> {
-    FACTORY
-        .lock()
-        .unwrap()
-        .create_extractor(url)?
-        .extract(url, content)
+    let (ext, _name) = FACTORY.lock().unwrap().create_extractor(url)?;
+    ext.extract(url, content)
 }

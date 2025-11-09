@@ -16,9 +16,10 @@ use scraper::{Html, Selector};
 use crate::error::*;
 use crate::models::*;
 use crate::traits::Extractor;
+use crate::utils::*;
 
 // 题目链接
-static PROBLEM_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"题目ID：\s*(\d+)").unwrap());
+static PROBLEM_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"题目ID[:：]\s*(\d+)").unwrap());
 
 // 提交记录链接
 static RECORD_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -26,8 +27,11 @@ static RECORD_REGEX: Lazy<Regex> = Lazy::new(|| {
 });
 
 // 从编译结果中提取时间和内存
-static TIME_MEM_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"time: (\d+)ms, memory: (\d+)kb").unwrap());
+// 捕获带单位的 time 与 memory 字符串 (支持大小写) , 例如: "time: 350ms, memory: 141628kb" 或 "time: 0.2s, memory: 1MB"
+static TIME_MEM_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)time:\s*([0-9.]+\s*(?:ms|s)?)\s*,\s*memory:\s*([0-9.]+\s*(?:kb|k|mb|m|b)?)")
+        .unwrap()
+});
 
 // 从得分文本中提取分数
 static SCORE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\d+)\s*分").unwrap());
@@ -180,14 +184,11 @@ impl XinyouduiExtractor {
             let compilation_text = compilation_div.text().collect::<String>();
 
             if let Some(caps) = TIME_MEM_REGEX.captures(&compilation_text) {
-                let time = caps
-                    .get(1)
-                    .and_then(|m| m.as_str().parse().ok())
-                    .unwrap_or(0);
-                let memory = caps
-                    .get(2)
-                    .and_then(|m| m.as_str().parse().ok())
-                    .unwrap_or(0);
+                let time_str = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+                let mem_str = caps.get(2).map(|m| m.as_str()).unwrap_or("");
+
+                let time = parse_time_to_ms(time_str).unwrap_or(0);
+                let memory = parse_mem_to_kb(mem_str).unwrap_or(0);
                 return (time, memory);
             }
         }
@@ -266,7 +267,7 @@ fn test_extractor() -> Result<()> {
                 <div class="_top_10upj_56">
                     <div class="_left_10upj_61">
                         <div class="_tags_10upj_68 print-hide">
-                            <span class="ac-ant-tag css-oxq8ps">题目ID：23051</span>
+                            <span class="ac-ant-tag css-oxq8ps">题目ID: 23051</span>
                             <span class="ac-ant-tag ac-ant-tag-blue css-oxq8ps">必做题</span>
                         </div>
                     </div>

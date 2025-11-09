@@ -1,8 +1,8 @@
 [package]
 name = "runtime"
-author = "fltLi"
-version = "0.1.1"
-edition = "2024"
+author.workspace = true
+version.workspace = true
+edition.workspace = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]

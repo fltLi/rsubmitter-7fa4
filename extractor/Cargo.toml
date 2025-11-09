@@ -1,13 +1,13 @@
 [package]
 name = "extractor"
-author = "fltLi"
-version = "0.1.1"
-edition = "2024"
+author.workspace = true
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 registry = { path = "./proc-macro/registry" }
-thiserror = { workspace = true }
-once_cell = { workspace = true }
-regex = { workspace = true }
-serde = { workspace = true }
+thiserror.workspace = true
+once_cell.workspace = true
+regex.workspace = true
+serde.workspace = true
 scraper = "*"

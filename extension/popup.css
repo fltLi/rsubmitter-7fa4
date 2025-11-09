@@ -21,12 +21,19 @@
   --radius: 6px;
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 /* 基础重置 */
 html,
 body {
   margin: 0;
   padding: 0;
-  width: 340px;
+  min-width: 340px;
+  max-width: 480px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 13px;
   color: var(--text-primary);
@@ -36,6 +43,7 @@ body {
 /* 主容器 */
 .container {
   padding: 14px 16px 12px;
+  overflow: visible;
 }
 
 /* 头部区域 */
@@ -67,6 +75,31 @@ body {
   flex-grow: 1;
 }
 
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  overflow: visible;
+  justify-content: flex-start;
+}
+
+.actions>#getCookies {
+  flex: 0 0 110px;
+  width: 110px;
+  min-width: 88px;
+}
+
+.split-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+  min-width: 0;
+
+}
+
+/* 状态标签 */
 .status {
   font-size: 11px;
   padding: 4px 8px;
@@ -85,16 +118,60 @@ body {
   color: var(--error);
 }
 
-/* 按钮区域 */
-.actions {
+.split-btn>.btn {
+  flex: 1 0 auto;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: none;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  min-width: 0;
+}
+
+.split-btn>#sendPage {
+  flex: 0 0 120px;
+  width: 120px;
+  min-width: 96px;
+}
+
+.split-btn>.btn.small {
+  flex: 0 0 32px;
+  padding: 6px 8px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: none;
   display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.send-options {
+  position: static;
+  margin-top: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  padding: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-basis: 100%;
+  width: 100%;
+  min-width: 180px;
+  white-space: normal;
+}
+
+.send-options label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .btn {
-  flex: 1;
-  padding: 8px 12px;
+  padding: 6px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-primary);
@@ -102,6 +179,10 @@ body {
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .btn:hover {
@@ -112,10 +193,24 @@ body {
   background: var(--primary);
   border-color: var(--primary);
   color: white;
+  flex: 1;
+  min-width: 0;
 }
 
 .btn.primary:hover {
   background: var(--primary-dark);
+}
+
+.btn.small {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.btn.small.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
 }
 
 /* 消息区域 */
